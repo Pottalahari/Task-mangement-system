@@ -219,3 +219,313 @@
 </html>
 
 
+
+@{
+    ViewBag.Title = "Task Management";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ViewBag.Title</title>
+    <style>
+        /* Your CSS styles for layout and formatting */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .actions {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+            .actions button {
+                margin: 10px;
+                padding: 10px 20px;
+                font-size: 16px;
+                color: white;
+                background-color: #3498db;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+            }
+
+                .actions button:hover {
+                    background-color: #2980b9;
+                }
+
+        .form-container {
+            display: none;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #fff;
+            max-width: 500px;
+            margin: 0 auto 20px;
+        }
+
+            .form-container label {
+                font-weight: bold;
+                display: block;
+                margin: 10px 0 5px;
+            }
+
+            .form-container input, .form-container select {
+                width: 100%;
+                padding: 10px;
+                margin-bottom: 15px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+            }
+
+            .form-container button {
+                padding: 10px 20px;
+                background-color: #2ecc71;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+
+        td {
+            background-color: #f9f9f9;
+        }
+
+        #responseMessage {
+            text-align: center;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+
+        .response-box {
+            background-color: #2ecc71;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 20px auto;
+            width: 80%;
+            text-align: center;
+        }
+
+        .error-box {
+            background-color: #e74c3c;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 20px auto;
+            width: 80%;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Task Management</h1>
+
+    <div class="actions">
+        <button id="btnShowAddForm">Add Task</button>
+        <button id="btnShowUpdateForm">Update Task</button>
+        <button id="btnShowDeleteForm">Delete Task</button>
+        <button id="btnFetchTasks">View All Tasks</button>
+    </div>
+
+    <div id="responseMessage" class="response-box" style="display: none;"></div>
+
+    <div class="form-container" id="formContainer">
+        <h2 id="formTitle">Task Form</h2>
+        <div>
+            <label for="taskId">Task ID:</label>
+            <input type="number" id="taskId" placeholder="Enter Task ID">
+        </div>
+        <div id="taskDetails">
+            <label for="taskName">Task Name:</label>
+            <input type="text" id="taskName" placeholder="Enter Task Name">
+            <label for="projectId">Project ID:</label>
+            <input type="number" id="projectId" placeholder="Enter Project ID">
+            <label for="assignedToUserId">Assigned To User ID:</label>
+            <input type="number" id="assignedToUserId" placeholder="Enter User ID">
+            <label for="taskStartDate">Start Date:</label>
+            <input type="datetime-local" id="taskStartDate">
+            <label for="taskEndDate">End Date:</label>
+            <input type="datetime-local" id="taskEndDate">
+            <label for="priority">Priority:</label>
+            <select id="priority">
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+            </select>
+            <label for="status">Status:</label>
+            <select id="status">
+                <option value="Not Started">Not Started</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
+            </select>
+        </div>
+        <button id="btnSubmitForm">Submit</button>
+    </div>
+
+    <div id="tasksList"></div>
+
+    <script>
+        const apiUrl = 'https://localhost:7071/api/TaskTbls';
+
+        document.getElementById('btnShowAddForm').addEventListener('click', () => showForm('Add Task'));
+        document.getElementById('btnShowUpdateForm').addEventListener('click', () => showForm('Update Task'));
+        document.getElementById('btnShowDeleteForm').addEventListener('click', () => showForm('Delete Task', true));
+        document.getElementById('btnFetchTasks').addEventListener('click', fetchAllTasks);
+        document.getElementById('btnSubmitForm').addEventListener('click', handleSubmit);
+        document.getElementById('taskId').addEventListener('blur', fetchTaskDetails);
+
+        function showForm(title, isDelete = false) {
+            document.getElementById('formTitle').textContent = title;
+            document.getElementById('formContainer').style.display = 'block';
+            document.getElementById('taskId').parentElement.style.display = 'block'; // Always show Task ID
+            document.getElementById('taskDetails').style.display = isDelete ? 'none' : 'block';
+        }
+
+        function handleSubmit() {
+            const title = document.getElementById('formTitle').textContent;
+
+            if (title === 'Add Task') addTask();
+            else if (title === 'Update Task') updateTask();
+            else if (title === 'Delete Task') deleteTask();
+        }
+
+        function fetchTaskDetails() {
+            const taskId = document.getElementById('taskId').value;
+
+            if (!taskId || document.getElementById('formTitle').textContent !== 'Update Task') return;
+
+            fetch(`${apiUrl}/${taskId}`)
+                .then(res => {
+                    if (!res.ok) throw new Error('Task not found');
+                    return res.json();
+                })
+                .then(task => populateTaskDetails(task))
+                .catch(() => showMessage('Task not found', true));
+        }
+
+        function populateTaskDetails(task) {
+            document.getElementById('taskName').value = task.taskName || '';
+            document.getElementById('projectId').value = task.projectId || '';
+            document.getElementById('assignedToUserId').value = task.assignedToUserId || '';
+            document.getElementById('taskStartDate').value = task.taskStartDate || '';
+            document.getElementById('taskEndDate').value = task.taskEndDate || '';
+            document.getElementById('priority').value = task.priority || '';
+            document.getElementById('status').value = task.status || '';
+        }
+
+        function addTask() {
+            const taskData = getFormData();
+            fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(taskData)
+            })
+                .then(res => res.ok ? showMessage('Task added successfully') : showMessage('Error adding task', true));
+        }
+
+        function updateTask() {
+            const taskData = getFormData();
+            fetch(`${apiUrl}/${taskData.taskId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(taskData)
+            })
+                .then(res => res.ok ? showMessage('Task updated successfully') : showMessage('Error updating task', true));
+        }
+
+        function deleteTask() {
+            const taskId = document.getElementById('taskId').value;
+            fetch(`${apiUrl}/${taskId}`, {
+                method: 'DELETE'
+            })
+                .then(res => res.ok ? showMessage('Task deleted successfully') : showMessage('Error deleting task', true));
+        }
+
+        function fetchAllTasks() {
+            fetch(apiUrl)
+                .then(res => res.json())
+                .then(data => renderTasksTable(data))
+                .catch(() => showMessage('Error fetching tasks', true));
+        }
+
+        function getFormData() {
+            return {
+                taskId: document.getElementById('taskId').value,
+                taskName: document.getElementById('taskName').value,
+                projectId: document.getElementById('projectId').value,
+                assignedToUserId: document.getElementById('assignedToUserId').value,
+                taskStartDate: document.getElementById('taskStartDate').value,
+                taskEndDate: document.getElementById('taskEndDate').value,
+                priority: document.getElementById('priority').value,
+                status: document.getElementById('status').value
+            };
+        }
+
+        function renderTasksTable(tasks) {
+            const tasksListDiv = document.getElementById('tasksList');
+            tasksListDiv.innerHTML = '';
+
+            const table = document.createElement('table');
+            const headerRow = document.createElement('tr');
+            ['Task ID', 'Task Name', 'Project ID', 'Assigned User ID', 'Start Date', 'End Date', 'Priority', 'Status'].forEach(text => {
+                const th = document.createElement('th');
+                th.textContent = text;
+                headerRow.appendChild(th);
+            });
+            table.appendChild(headerRow);
+
+            tasks.forEach(task => {
+                const row = document.createElement('tr');
+                ['taskId', 'taskName', 'projectId', 'assignedToUserId', 'taskStartDate', 'taskEndDate', 'priority', 'status']
+                    .forEach(field => {
+                        const td = document.createElement('td');
+                        td.textContent = task[field];
+                        row.appendChild(td);
+                    });
+                table.appendChild(row);
+            });
+
+            tasksListDiv.appendChild(table);
+        }
+
+        function showMessage(message, isError = false) {
+            const responseMessage = document.getElementById('responseMessage');
+            responseMessage.textContent = message;
+            responseMessage.style.display = 'block';
+            responseMessage.className = isError ? 'error-box' : 'response-box';
+        }
+    </script>
+</body>
+</html>
+
+
+
+
